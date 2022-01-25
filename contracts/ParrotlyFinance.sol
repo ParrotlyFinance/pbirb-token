@@ -12,10 +12,10 @@ contract ParrotlyFinance is IERC20, IERC20Metadata, Context, Ownable {
     using Address for address;
 
     // Basic Setup 
-    uint8 private _decimals = 18;
+    uint8 private _decimals = 9;
     uint256 private _totalSupply = 1 * 10**12 * 10**_decimals;
     string private _name = "ParrotlyFinance";
-    string private _symbol = "PBIRBTEST26";
+    string private _symbol = "PBIRB";
 
     uint8 public _buyFee = 4;
     uint8 private _previousBuyFee = _buyFee;
@@ -28,10 +28,10 @@ contract ParrotlyFinance is IERC20, IERC20Metadata, Context, Ownable {
 
     IUniswapV2Router02 private _quickSwapRouter;
     address private _quickSwapPair;
-    address private constant _quickSwapRouterAddress = 0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff; // Quickswap
+    address private _quickSwapRouterAddress = 0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff; // Quickswap
     // address private constant _quickSwapRouterAddress = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; // Uniswap
-    address public immutable _deadWallet = 0x000000000000000000000000000000000000dEaD;
-    address public _serviceWallet = 0x049DE3990D8a938d627730696a53B7042782120E;
+    address private immutable _deadWallet = 0x000000000000000000000000000000000000dEaD;
+    address private _serviceWallet = 0x049DE3990D8a938d627730696a53B7042782120E;
 
     event RemoveFees();
     event RestoreFees();
@@ -44,7 +44,7 @@ contract ParrotlyFinance is IERC20, IERC20Metadata, Context, Ownable {
     constructor() {
         _quickSwapRouter = IUniswapV2Router02(_quickSwapRouterAddress);
         _quickSwapPair = IUniswapV2Factory(_quickSwapRouter.factory())
-            .createPair(address(this), _quickSwapRouter.WETH());
+                            .createPair(address(this), _quickSwapRouter.WETH());
 
         _excludedFromFees[_msgSender()] = true;
         _excludedFromFees[address(this)] = true;
@@ -166,7 +166,7 @@ contract ParrotlyFinance is IERC20, IERC20Metadata, Context, Ownable {
         return _serviceWallet;
     }
 
-    function updateBuyFee(uint8 value) public onlyOwner {
+    function updateBuyFee(uint8 value) public onlyOwner returns(uint8, uint8) {
         require(value <= 4, "Buy fee cannot be higher than 4");
         require(value < _buyFee, "You cannot increase the fee");
 
@@ -174,24 +174,31 @@ contract ParrotlyFinance is IERC20, IERC20Metadata, Context, Ownable {
         _buyFee = value;
 
         emit UpdateBuyFee(_previousBuyFee, value);
+
+        return (_buyFee, _previousBuyFee);
     }
 
     function updateServiceWallet(address newServiceWallet) public onlyOwner {
-        require(_serviceWallet != newServiceWallet, "Same address");
+        require(_serviceWallet != newServiceWallet, "This address is already in-use");
+
+        _excludedFromFees[_serviceWallet] = false; // Restore fee for old Service Wallet
+        _excludedFromFees[newServiceWallet] = true; // Exclude new Service Wallet
 
         _serviceWallet = newServiceWallet;
 
         emit UpdateServiceWallet(newServiceWallet);
     }
 
-    function updateSellFee(uint8 value) public onlyOwner {
-        require(value <= 2, "Buy fee cannot be higher than 4");
+    function updateSellFee(uint8 value) public onlyOwner returns(uint8, uint8) {
+        require(value <= 2, "Sell fee cannot be higher than 2%");
         require(value < _sellFee, "You cannot increase the fee");
 
         _previousSellFee = _sellFee;
         _sellFee = value;
 
         emit UpdateSellFee(_previousSellFee, value);
+        
+        return (_sellFee, _previousSellFee);
     }
 
     // Private

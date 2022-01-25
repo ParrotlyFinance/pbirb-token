@@ -37,7 +37,11 @@
     "dotenv": "^9.0.0",
     "prettier": "^2.5.1",
     "prettier-plugin-solidity": "^1.0.0-beta.19",
-    "truffle-assertions": "^0.9.2"
+    "semistandard": "^16.0.1",
+    "standard": "^16.0.4",
+    "standardx": "^7.0.0",
+    "truffle-assertions": "^0.9.2",
+    "ts-standard": "^11.0.0"
   },
   "dependencies": {
     "solc": "^0.8.11"
