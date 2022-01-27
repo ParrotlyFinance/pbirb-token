@@ -2,8 +2,9 @@ const HDWalletProvider = require('@truffle/hdwallet-provider');
 // create a file at the root of your project and name it .env -- there you can set process variables
 // like the mnemomic and Infura project key below. Note: .env is ignored by git to keep your private information safe
 require('dotenv').config();
-const mnemonic = process.env["MNEMONIC_MAINNET"];
-const private_key = process.env["PRIVATE_KEY"];
+const mnemonic_test = process.env["MNEMONIC_TESTNET"];
+const mnemonic_main = process.env["MNEMONIC_MAINNET"];
+// const private_key = process.env["PRIVATE_KEY"];
 const infuraProjectId = process.env["INFURA_PROJECT_ID"];
 
 module.exports = {
@@ -24,27 +25,24 @@ module.exports = {
       host: "127.0.0.1",     // Localhost (default: none)
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "*",       // Any network (default: none)
-      gas: 4712388
     },
     polygon_infura_mainnet: {
       provider: () => new HDWalletProvider({
         mnemonic: {
-          phrase: mnemonic
+          phrase: mnemonic_main
         },
         providerOrUrl:
-         "https://polygon-mainnet.infura.io/v3/" + infuraProjectId
+          "https://polygon-mainnet.infura.io/v3/" + infuraProjectId,
+          addressIndex: 0
       }),
       network_id: 137,
-      confirmations: 2,
-      timeoutBlocks: 200,
-      skipDryRun: true,
       chainId: 137
     },
     //polygon Infura testnet
     polygon_infura_testnet: {
       provider: () => new HDWalletProvider({
         mnemonic: {
-          phrase: mnemonic
+          phrase: mnemonic_test
         },
         providerOrUrl:
          "https://polygon-mumbai.infura.io/v3/" + infuraProjectId
@@ -58,8 +56,7 @@ module.exports = {
     ropsten:  {
      network_id: 3,
      host: "localhost",
-     port:  8545,
-     gas:   2900000
+     port:  8545
     }
   },
 
@@ -77,7 +74,7 @@ module.exports = {
       },
       optimizer: {
         enabled: true,
-        runs: 9999
+        runs: 999999
       }
     }
   },
@@ -85,9 +82,6 @@ module.exports = {
     'truffle-plugin-verify'
   ],
   api_keys: {
-    polygonscan: process.env.POLYGONSCAN_API_KEY
-  },
-  polygonscan: {
-    apiKey: process.env.POLYGONSCAN_API_KEY //replace this with your API key if you have one
+    polygonscan: 'PN22E6BRMAWTY7YDRJZYMJP1KD2P1BP98Z'
   }
 }

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.11;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -91,11 +91,6 @@ contract ParrotlyFinance is IERC20, Context, Ownable {
         return _balances[account];
     }
 
-    function transfer(address recipient, uint256 amount) public returns (bool) {
-        _transfer(_msgSender(), recipient, amount);
-        return true;
-    }
-
     function allowance(address owner, address spender) external view returns (uint256) {
         return _allowances[owner][spender];
     }
@@ -108,16 +103,24 @@ contract ParrotlyFinance is IERC20, Context, Ownable {
         address sender,
         address recipient,
         uint256 amount
-    ) external override returns (bool) {
+    ) external returns (bool) {
         _transfer(sender, recipient, amount);
 
         uint256 currentAllowance = _allowances[sender][_msgSender()];
-        require(currentAllowance >= amount, "Transfer amount exceeds allowance");
+        require(currentAllowance >= amount, "Amount exceeds allowance");
         unchecked {
             _approve(sender, _msgSender(), currentAllowance - amount);
         }
 
         return true;
+    }
+
+    function buyFee() external view returns (uint8) {
+        return _buyFee;
+    }
+    
+    function sellFee() external view returns (uint8) {
+        return _sellFee;
     }
 
     // Public
@@ -127,8 +130,9 @@ contract ParrotlyFinance is IERC20, Context, Ownable {
         return true;
     }
 
-    function buyFee() public view returns (uint8) {
-        return _buyFee;
+    function transfer(address recipient, uint256 amount) public returns (bool) {
+        _transfer(_msgSender(), recipient, amount);
+        return true;
     }
 
     function excludeFromFees(address excludedAddress, bool value) public onlyOwner {
@@ -159,10 +163,6 @@ contract ParrotlyFinance is IERC20, Context, Ownable {
         _sellFee = _previousSellFee;
 
         emit RestoreFees();
-    }
-
-    function sellFee() public view returns (uint8) {
-        return _sellFee;
     }
 
     function serviceWallet() public view returns(address) {

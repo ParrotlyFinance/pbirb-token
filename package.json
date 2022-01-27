@@ -1,5 +1,5 @@
 {
-  "name": "ParrotlyFinance",
+  "name": "Parrotly Finance",
   "version": "1.0.0",
   "description": "Token for Parrotly Finance",
   "main": "truffle-config.js",
@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/truffle-box/polygon-box.git"
+    "url": "git@github.com:ParrotlyFinance/pbirb-token.git"
   },
   "keywords": [
     "Matic",
@@ -20,17 +20,15 @@
   "author": "",
   "license": "",
   "bugs": {
-    "url": "https://github.com/truffle-box/polygon-box/issues"
+    "url": "https://github.com/ParrotlyFinance/pbirb-token/issues"
   },
-  "homepage": "",
+  "homepage": "https://parrotly.finance/",
   "devDependencies": {
     "@maticnetwork/maticjs": "^2.0.40",
     "@openzeppelin/contracts": "^4.4.1",
-    "@truffle/hdwallet-provider": "^1.4.2",
-    "@uniswap/lib": "^4.0.1-alpha",
+    "@truffle/hdwallet-provider": "^1.7.0",
     "@uniswap/v2-core": "^1.0.1",
     "@uniswap/v2-periphery": "^1.1.0-beta.0",
-    "@uniswap/v3-periphery": "^1.3.0",
     "chai": "^4.3.4",
     "chai-as-promised": "^7.1.1",
     "chai-bn": "^0.3.0",
