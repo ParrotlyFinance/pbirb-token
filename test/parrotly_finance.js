@@ -1,4 +1,5 @@
 const ParrotlyFinance = artifacts.require("ParrotlyFinance");
+const helper = require("./helpers/time_travel");
 const { assert } = require("chai");
 const chai = require("chai");
 const chaiAsPromised = require("chai-as-promised");
@@ -8,15 +9,18 @@ chai.use(chaiAsPromised);
 contract("ParrotlyFinance", (accounts) => {
   const deployer = accounts[0];
   const _serviceWallet = "0x049DE3990D8a938d627730696a53B7042782120E";
+  const _deadWallet = "0x000000000000000000000000000000000000dEaD";
   const _totalSupply = 1000000000000000000000000000000;
   var contract;
   var contract_address;
 
   beforeEach('Setup contract', async () => {
-    contract = await ParrotlyFinance.deployed();
+    contract = await ParrotlyFinance.new();
     contract_address = contract.address;
   });
 
+  // Constructor
+  
   context ("With initial deployment", async () => {
     it("Sets basic token information", async function () {
       var supply = await contract.totalSupply()
@@ -37,40 +41,43 @@ contract("ParrotlyFinance", (accounts) => {
     });
   });
 
+  // External
+
+  context ("#setAutomatedMarketMakerPair", async () => {
+    it ("Set and address as MarketPair", async () => {
+      await contract.setAutomatedMarketMakerPair(accounts[1], true);
+      assert.isTrue(await contract.getAutomatedMarketMakerPair(accounts[1]));
+    });
+  });
+
   context ("#buyFee", async () => {
     it ("returns the buyFee", async () => {
       assert.equal(await contract.buyFee(), 4);
     });
   });
 
-  context ("#excludeFromFees", async () => {
-    const excludedAddress = "0x0000000000000000000000000000000000000001";
-
-    it("Add wallet to excludeFromFees", async () => {
-      assert.isFalse(await contract.excludedFromFees(excludedAddress));
-      await contract.excludeFromFees(excludedAddress, true);
-      assert.isTrue(await contract.excludedFromFees(excludedAddress));
-    });
-
-    it ("Cannot add an address with the same value", async () => {
-      await truffleAssert.fails(
-        contract.excludeFromFees(excludedAddress, true),
-        "This address is already set with this value."
-      );
+  context ("#sellFee", async () => {
+    it ("returns the sellFee", async () => {
+      assert.equal(await contract.sellFee(), 2);
     });
   });
 
-  context ("#excludedFromFees", async () => {
-    const excludedAddress = "0x0000000000000000000000000000000000000002";
+  // Public
 
-    it ("returns false if address IS NOT excluded from fee", async () => {
-      await contract.excludeFromFees(excludedAddress, false);
+  context ("#excludeFromFees", async () => {
+    it("Add wallet to excludeFromFees", async () => {
+      assert.isFalse(await contract.excludedFromFees(accounts[1]));
+      await contract.excludeFromFees(accounts[1], true);
+      assert.isTrue(await contract.excludedFromFees(accounts[1]));
     });
 
-    it ("returns true if address IS excluded from fee", async () => {
-      assert.isFalse(await contract.excludedFromFees(excludedAddress));
-      await contract.excludeFromFees(excludedAddress, true);
-      assert.isTrue(await contract.excludedFromFees(excludedAddress));
+    it ("Cannot add an address with the same value", async () => {
+      await contract.excludeFromFees(accounts[1], true); // Add it first
+
+      await truffleAssert.fails(
+        contract.excludeFromFees(accounts[1], true),
+        "Already set to this value"
+      );
     });
   });
 
@@ -85,21 +92,10 @@ contract("ParrotlyFinance", (accounts) => {
   });
 
   context ("#restoreFees", async () => {
-    before('Disable Fees', async () => {
-      await contract.removeFees();
-    });
-
     it ("returns all the fees at the value before their removal", async () => {
-      assert.equal(await contract.buyFee(), 0);
-      assert.equal(await contract.sellFee(), 0);
+      await contract.removeFees(); // Remove all the fees first
       await contract.restoreFees();
       assert.equal(await contract.buyFee(), 4);
-      assert.equal(await contract.sellFee(), 2);
-    });
-  });
-
-  context ("#sellFee", async () => {
-    it ("returns the sellFee", async () => {
       assert.equal(await contract.sellFee(), 2);
     });
   });
@@ -112,67 +108,159 @@ contract("ParrotlyFinance", (accounts) => {
 
   context ("#updateBuyFee", async () => {
     it ("updates the buy fee", async () => {
-        const {0: buyFee, 1: previousBuyFee} = await contract.updateBuyFee.call(1, { from: deployer });
-        assert.equal(buyFee, 1);
-        assert.equal(previousBuyFee, 4);
+        await contract.updateBuyFee(1);
+        assert.equal(await contract.buyFee(), 1);
     });
 
     it ("cannot be set higher than 4", async () => {
         await truffleAssert.fails(
-        contract.updateBuyFee(5),
-        "Buy tax cannot be higher than 4%"
+          contract.updateBuyFee(5),
+          "Cannot be higher than 4"
         );
     });
 
     it ("Cannot be increased higher than the current tax", async () => {
-        await contract.updateBuyFee.call(1, { from: deployer });
-
+        await contract.updateBuyFee(1);
         await truffleAssert.fails(
-            contract.updateBuyFee.call(2, { from: deployer }),
-            "You cannot increase the fee"
+          contract.updateBuyFee(3),
+          "Cannot increase the fee"
         );
     });
   });
 
   context ("#updateServiceWallet", async () => {
-    const newWallet = "0x0000000000000000000000000000000000001111";
-
-    before('Update the service wallet', async () => {
-      await contract.updateServiceWallet(newWallet);
+    beforeEach('Update the service wallet', async () => {
+      await contract.updateServiceWallet(accounts[1]);
     });
 
     it ("Changes the serviceWallet address and exclude it from the fees", async () => {
-      assert.equal(await contract.serviceWallet(), newWallet);
-      assert.equal(await contract.excludedFromFees(newWallet), true);
+      assert.equal(await contract.serviceWallet(), accounts[1]);
+      assert.equal(await contract.excludedFromFees(accounts[1]), true);
     });
 
     it ("Cannot be updated with the same address", async () => {
         await truffleAssert.fails(
-            contract.updateServiceWallet(newWallet),
-            "This address is already in-use"
+          contract.updateServiceWallet(accounts[1]),
+          "Address is already in-use"
         );
     });
   });
 
   context ("#updateSellFee", async () => {
     it ("updates the sell fee", async () => {
-      const {0: sellFee, 1: previousSellFee} = await contract.updateSellFee.call(1, { from: deployer });
-      assert.equal(sellFee, 1);
-      assert.equal(previousSellFee, 2);
+      await contract.updateSellFee(1);
+      assert.equal(await contract.sellFee(), 1);
     });
 
     it ("cannot be set higher than 2", async () => {
       await truffleAssert.fails(
         contract.updateSellFee(3),
-        "Sell tax cannot be higher than 2%"
+        "Cannot be higher than 2"
       );
     });
 
     it ("Cannot be increased higher than the current tax", async () => {
+      await contract.updateSellFee(0);
+      await truffleAssert.fails(
+          contract.updateSellFee(1),
+          "Cannot increase the fee"
+      );
+    });
+  });
+
+  context ("#transfer", async () => {
+    context ("When trading is disabled", async () => {
+      it ("refuses all transfer", async () => {
         await truffleAssert.fails(
-            contract.updateSellFee.call(2, { from: deployer }),
-            "You cannot increase the fee"
+          contract.transfer(accounts[2], 0, { from: accounts[1] }),
+          "Trading is not enabled."
         );
+      });
+
+      it ("transfers and allow without any fees if sender IS owner", async () => {
+        await contract.transfer(accounts[1], 10000000, { from: accounts[0] });
+        assert.equal(await contract.balanceOf(accounts[1]), 10000000);
+      });
+    });
+
+    context ("When the Trading is enable for less than 5 block and send is NOT owner", async () => {
+      beforeEach("Activate Trading", async () => {
+        await contract.enableTrading();
+        await contract.transfer(accounts[1], 10000000, { from: accounts[0] });
+      });
+
+      it ("Set the tax to 99%", async () => {
+        // Set time 1 seconde after the last block
+        const advancement = 1;
+        const originalBlock = web3.eth.getBlock('latest');
+        await helper.advanceTime(advancement);
+
+        await contract.transfer(accounts[2], 100000, { from: accounts[1] });
+        assert(await contract.balanceOf(accounts[2]), 100000);
+        assert(await contract.balanceOf(_serviceWallet), 100000);
+      });
+    });
+  });
+
+  context ("#transfer", async () => {
+    beforeEach("Activate Trading", async () => {
+      await contract.enableTrading();
+      await contract.transfer(accounts[1], 10000000, { from: accounts[0] });
+
+      // Time Travel to set the next block timestamp to +100sec
+      await helper.advanceTimeAndBlock(100);
+    });
+
+    context ("When the sender or receiver are exempt from fees", async () => {
+      beforeEach('Adds address as exempt from fees', async () => {
+        await contract.excludeFromFees(accounts[1], true);
+      });
+
+      it ("Sends the token without any fee", async () => {
+        assert.isTrue(await contract.excludedFromFees(accounts[1]));
+        await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
+        assert.equal(await contract.balanceOf(accounts[2]), 10000000);
+      });
+    });
+
+    context ("When the sender AND receiver are NOT a Market Pair address (see _automatedMarketMakerPairs)", async () => {
+      it ("Sends the token without any fee", async () => {
+        assert.isFalse(await contract.getAutomatedMarketMakerPair(accounts[0]));
+        assert.isFalse(await contract.getAutomatedMarketMakerPair(accounts[1]));
+
+        await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
+        assert(await contract.balanceOf(accounts[2]), 10000000);
+      });
+    });
+
+    context ("When the sender is a Market Pair Address", async () => {
+      beforeEach("Add accounts[1] as Market Pair Address", async () => {
+        await contract.setAutomatedMarketMakerPair(accounts[1], true);
+        await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
+      });
+
+      it ("Sends PBIRB amount minus the BUY fees to the recipient", async () => {
+        assert.equal(await contract.balanceOf(accounts[2]), 9600000);
+      });
+
+      it ("Sends fees from the original amount to the Service wallet", async () => {
+        assert.equal(await contract.balanceOf(_serviceWallet), 400000);
+      });
+    });
+
+    context ("When the recipient is a Market Pair Address", async () => {
+      beforeEach("Add accounts[1] as Market Pair Address", async () => {
+        await contract.setAutomatedMarketMakerPair(accounts[2], true);
+        await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
+      });
+
+      it ("Sends PBIRB amount minus the SELL fees to the recipient", async () => {
+        assert.equal(await contract.balanceOf(accounts[2]), 9800000);
+      });
+
+      it ("Sends fees from the original amount to the Dead wallet", async () => {
+        assert.equal(await contract.balanceOf(_deadWallet), 200000);
+      });
     });
   });
 });

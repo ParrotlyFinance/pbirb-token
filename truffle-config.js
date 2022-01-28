@@ -25,6 +25,7 @@ module.exports = {
       host: "127.0.0.1",     // Localhost (default: none)
       port: 8545,            // Standard Ethereum port (default: none)
       network_id: "*",       // Any network (default: none)
+      gas: 5000000,
     },
     polygon_infura_mainnet: {
       provider: () => new HDWalletProvider({
@@ -36,7 +37,9 @@ module.exports = {
           addressIndex: 0
       }),
       network_id: 137,
-      chainId: 137
+      gas: 20000000,
+      gasPrice: 50000000000,
+      confirmations: 2,
     },
     //polygon Infura testnet
     polygon_infura_testnet: {
@@ -51,13 +54,27 @@ module.exports = {
       confirmations: 2,
       timeoutBlocks: 200,
       skipDryRun: true,
-      chainId: 80001
+      chainId: 80001,
     },
     ropsten:  {
      network_id: 3,
      host: "localhost",
      port:  8545
-    }
+    },
+    binance_testnet: {
+      provider: () => new HDWalletProvider(mnemonic_test, 'https://data-seed-prebsc-1-s1.binance.org:8545/'),
+      network_id: 97,
+      confirmations: 10,
+      timeoutBlocks: 200,
+      skipDryRun: true
+    },
+    binance_mainnet: {
+      provider: () => new HDWalletProvider(mnemonic_main, 'https://bsc-dataseed1.binance.org'),
+      network_id: 56,
+      confirmations: 10,
+      timeoutBlocks: 200,
+      skipDryRun: true
+    },
   },
 
   // Set default mocha options here, use special reporters etc.
