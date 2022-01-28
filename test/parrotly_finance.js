@@ -1,5 +1,5 @@
 const ParrotlyFinance = artifacts.require("ParrotlyFinance");
-const helper = require("./helpers/time_travel");
+const time_travel = require("./helpers/time_travel");
 const { assert } = require("chai");
 const chai = require("chai");
 const chaiAsPromised = require("chai-as-promised");
@@ -13,6 +13,8 @@ contract("ParrotlyFinance", (accounts) => {
   const _totalSupply = 1000000000000000000000000000000;
   var contract;
   var contract_address;
+  var snapShot;
+  var snapshotId;
 
   beforeEach('Setup contract', async () => {
     contract = await ParrotlyFinance.new();
@@ -185,30 +187,31 @@ contract("ParrotlyFinance", (accounts) => {
 
     context ("When the Trading is enable for less than 5 block and send is NOT owner", async () => {
       beforeEach("Activate Trading", async () => {
+        await contract.transfer(accounts[1], 1000, { from: accounts[0] });
+        await contract.setAutomatedMarketMakerPair(accounts[1], true);
         await contract.enableTrading();
-        await contract.transfer(accounts[1], 10000000, { from: accounts[0] });
+        snapShot = await time_travel.takeSnapshot();
+        snapshotId = snapShot['result'];
       });
 
       it ("Set the tax to 99%", async () => {
-        // Set time 1 seconde after the last block
-        const advancement = 1;
-        const originalBlock = web3.eth.getBlock('latest');
-        await helper.advanceTime(advancement);
-
-        await contract.transfer(accounts[2], 100000, { from: accounts[1] });
-        assert(await contract.balanceOf(accounts[2]), 100000);
-        assert(await contract.balanceOf(_serviceWallet), 100000);
+        await time_travel.revertToSnapShot(snapshotId);
+        await contract.transfer(accounts[2], 1000, { from: accounts[1] });
+        console.log(await contract.balanceOf(accounts[2]));
+        
+        assert.equal(await contract.balanceOf(accounts[2]), 300);
+        assert.equal(await contract.balanceOf(_serviceWallet), 700);
       });
     });
   });
 
   context ("#transfer", async () => {
     beforeEach("Activate Trading", async () => {
-      await contract.enableTrading();
       await contract.transfer(accounts[1], 10000000, { from: accounts[0] });
+      await contract.enableTrading();
 
       // Time Travel to set the next block timestamp to +100sec
-      await helper.advanceTimeAndBlock(100);
+      await time_travel.advanceTimeAndBlock(100);
     });
 
     context ("When the sender or receiver are exempt from fees", async () => {
@@ -229,7 +232,7 @@ contract("ParrotlyFinance", (accounts) => {
         assert.isFalse(await contract.getAutomatedMarketMakerPair(accounts[1]));
 
         await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
-        assert(await contract.balanceOf(accounts[2]), 10000000);
+        assert.equal(await contract.balanceOf(accounts[2]), 10000000);
       });
     });
 

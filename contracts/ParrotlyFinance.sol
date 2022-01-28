@@ -56,14 +56,18 @@
  *      - 2% to the Dead Wallet (burn)
  *    - Transfer wallet to wallet
  *      - NO taxes
- *    - Service wallet and CEX wallets are excluded from any tax.
+ *    - Taxes can ONLY be reduced and never increased. If moved from 4 to 3.
+ *      It will never (it's not possible) put it back to 4.
+ *    - Once both Buy and Sell are set to 0. NO other changes to the taxes will be possible.
+ *      The removal of taxes is definitive.
+ *    - Service wallet and CEX wallets are and will be excluded from any tax.
  *    - 0 initial dev or team wallets.
  *
  *
  *  Website -------- parrotly.finance/
  *  Whitepaper ----- parrotly.finance/resources/docs/Parrotly_Whitepaper_V1.pdf
  *  Twitter -------- twitter.com/ParrotlyFinance
- */
+**/
 
 pragma solidity ^0.8.11;
 
@@ -102,18 +106,7 @@ contract ParrotlyFinance is ERC20, Ownable {
     event ExcludeFromFees(address indexed newAdress, bool indexed value);
     event SetAutomatedMarketMakerPair(address indexed pairAddress, bool indexed value);
 
-    // Constructor
-    constructor() ERC20("ParrotlyFinance", "PBIRB") {
-        initPair();
-
-        excludeFromFees(owner(), true);
-        excludeFromFees(address(this), true);
-        excludeFromFees(_serviceWallet, true);
-
-
-
-        _mint(owner(), (1 * 10**12) * (10**18));
-    }
+    // Modifier
 
     modifier canTrade {
         if (msg.sender == owner()) {
@@ -123,7 +116,7 @@ contract ParrotlyFinance is ERC20, Ownable {
 
         require(_tradingEnabled || msg.sender == owner(), "Trading is not enabled");
 
-        if((_blockTimestampAtCreation + 5 < block.number) && msg.sender != owner()) {
+        if((_blockTimestampAtCreation + 15 < block.number) && msg.sender != owner()) {
             _buyFee = 99;
             _sellFee = 99;
             _;
@@ -132,6 +125,17 @@ contract ParrotlyFinance is ERC20, Ownable {
         } else {
             _;
         }
+    }
+
+    // Constructor
+    constructor() ERC20("ParrotlyFinance", "PBIRB") {
+        // initPair();
+
+        excludeFromFees(owner(), true);
+        excludeFromFees(address(this), true);
+        excludeFromFees(_serviceWallet, true);
+
+        _mint(owner(), (1 * 10**12) * (10**18));
     }
 
     // Receive function
