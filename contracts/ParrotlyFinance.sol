@@ -88,8 +88,8 @@ contract ParrotlyFinance is ERC20, Ownable {
     mapping (address => bool) public _automatedMarketMakerPairs;
     mapping (address => bool) private _exemptFromFee;
 
-    bool private _tradingEnabled = false;
-    uint private _blockTimestampAtCreation;
+    bool private _tradingEnabled = true;
+    uint private _unlockTradingAtBlock;
 
     IUniswapV2Router02 public quickSwapRouter;
     address public quickSwapPair;
@@ -114,14 +114,12 @@ contract ParrotlyFinance is ERC20, Ownable {
             return;
         }
 
-        require(_tradingEnabled || msg.sender == owner(), "Trading is not enabled");
+        require(_tradingEnabled, "Trading is not enabled");
 
-        if((_blockTimestampAtCreation + 15 < block.number) && msg.sender != owner()) {
-            _buyFee = 99;
-            _sellFee = 99;
+        if(block.number < _unlockTradingAtBlock) {
+            uberFee();
             _;
-            _buyFee = _previousBuyFee;
-            _sellFee = _previousSellFee;
+            resetUberFee();
         } else {
             _;
         }
@@ -151,28 +149,25 @@ contract ParrotlyFinance is ERC20, Ownable {
     ) internal override canTrade {
         require(sender != address(0), "Transfer from the zero address");
         require(recipient != address(0), "Transfer to the zero address");
+        require(_balances[sender] >= amount, "Transfer amount exceeds balance");
 
-        if(sender != owner())
-            require(_tradingEnabled, "Trading is not enable");
-
-        if(skipTax(sender, recipient)) {
-            super._transfer(sender, recipient, amount);
+        if (skipTax(sender, recipient)) {
+            _feelessTransfer(sender, recipient, amount);
         } else {
             _tokenTransfer(sender, recipient, amount);
         }
+
+        emit Transfer(sender, recipient, amount);
     }
 
     function initPair() internal {
-        IUniswapV2Router02 _quickSwapRouter = IUniswapV2Router02(_routerAddress);
-        address _quickSwapPair = IUniswapV2Factory(_quickSwapRouter.factory()).createPair(
+        quickSwapRouter = IUniswapV2Router02(_routerAddress);
+        quickSwapPair = IUniswapV2Factory(quickSwapRouter.factory()).createPair(
             address(this), 
-            _quickSwapRouter.WETH()
+            quickSwapRouter.WETH()
         );
 
-        quickSwapPair = _quickSwapPair;
-        quickSwapRouter = _quickSwapRouter;
-
-        setAutomatedMarketMakerPair(_quickSwapPair, true);
+        setAutomatedMarketMakerPair(quickSwapPair, true);
     }
 
 
@@ -190,17 +185,9 @@ contract ParrotlyFinance is ERC20, Ownable {
 
     function enableTrading() public onlyOwner {
         _tradingEnabled = true;
-        _blockTimestampAtCreation = block.number;
+        _unlockTradingAtBlock = block.number + 15;
 
         emit EnableTrading();
-    }
-
-    function getActiveBlockTimetamp() public view returns(uint) {
-        return _blockTimestampAtCreation;
-    }
-
-    function getBlockTimetamp() public view returns(uint) {
-        return block.number;
     }
 
     function excludeFromFees(address excludedAddress, bool value) public onlyOwner {
@@ -300,10 +287,9 @@ contract ParrotlyFinance is ERC20, Ownable {
         uint _totalFee = _calculateBuyFee(amount);
         uint _amountWithFee = amount - _totalFee;
 
-        super._transfer(sender, recipient, _amountWithFee); // Send coin to buyer
-        super._transfer(sender, _serviceWallet, _totalFee); // Send coin to Service Wallet
-
-        emit Transfer(sender, recipient, amount);
+        _balances[sender] -= amount;
+        _balances[recipient] += _amountWithFee;
+        _balances[_serviceWallet] += _totalFee;
     }
 
     function _calculateBuyFee(uint amount) private view returns (uint) {
@@ -320,6 +306,25 @@ contract ParrotlyFinance is ERC20, Ownable {
         return (amount * _sellFee) / 10**2;
     }
 
+    function _feelessTransfer(
+        address sender,
+        address recipient,
+        uint amount
+    ) private {
+        _balances[sender] -= amount;
+        _balances[recipient] += amount;
+    }
+
+    function uberFee() private {
+        _buyFee = 99;
+        _sellFee = 99;
+    }
+
+    function resetUberFee() private {
+        _buyFee = 0;
+        _sellFee = 0;
+    }
+
     function _sellTransfer(
         address sender,
         address recipient,
@@ -328,14 +333,13 @@ contract ParrotlyFinance is ERC20, Ownable {
         uint _totalFee = _calculateSellFee(amount);
         uint _amountWithFee = amount - _totalFee;
 
-        super._transfer(sender, recipient, _amountWithFee); // Send coin to buyer
-        super._transfer(sender, DEAD, _totalFee); // Send coin to Dead Wallet
-
-        emit Transfer(sender, recipient, amount);
+        _balances[sender] -= amount;
+        _balances[recipient] += _amountWithFee;
+        _balances[DEAD] += _totalFee;
     }
 
     function skipTax(address sender, address recipient) private view returns (bool) {
-        return (!_automatedMarketMakerPairs[sender] && !_automatedMarketMakerPairs[recipient]) &&
+        return (!_automatedMarketMakerPairs[sender] && !_automatedMarketMakerPairs[recipient]) ||
             (_exemptFromFee[sender] || _exemptFromFee[recipient]);
     }
 
@@ -349,7 +353,7 @@ contract ParrotlyFinance is ERC20, Ownable {
         } else if (_automatedMarketMakerPairs[recipient]) {
             _sellTransfer(sender, recipient, amount);
         } else {
-            super._transfer(sender, recipient, amount);
+            _feelessTransfer(sender, recipient, amount);
         }
     }
 }
