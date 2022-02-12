@@ -64,9 +64,9 @@
  *    - 0 initial dev or team wallets.
  *
  *
- *  Website -------- parrotly.finance/
- *  Whitepaper ----- parrotly.finance/resources/docs/Parrotly_Whitepaper_V1.pdf
- *  Twitter -------- twitter.com/ParrotlyFinance
+ *  Website -------- https://parrotly.finance
+ *  Whitepaper ----- https://parrotly.finance/resources/docs/Parrotly_Whitepaper.pdf
+ *  Twitter -------- https://twitter.com/ParrotlyFinance
 **/
 
 pragma solidity ^0.8.11;
