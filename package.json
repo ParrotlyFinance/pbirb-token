@@ -1,7 +1,7 @@
 {
-  "name": "Parrotly Finance",
+  "name": "parrotly",
   "version": "1.0.0",
-  "description": "Token for Parrotly Finance",
+  "description": "PBIRB token for Parrotly Finance",
   "main": "truffle-config.js",
   "directories": {
     "test": "test"

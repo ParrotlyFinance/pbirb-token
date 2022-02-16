@@ -47,7 +47,7 @@
  *                            =#=+++++**++*@#=++*@+                                         
  *                            ::::..  ..:--+-    :  
  *
- *  ParrotlyFinance (PBIRB)
+ *  Parrotly (PBIRB)
  *
  *  Tokenomics:
  *    - BUY:
@@ -77,7 +77,7 @@ import "@openzeppelin/contracts/utils/Address.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 
-contract ParrotlyFinance is ERC20, Ownable {
+contract Parrotly is ERC20, Ownable {
     using Address for address;
 
     uint8 public _buyFee = 4;
@@ -89,7 +89,7 @@ contract ParrotlyFinance is ERC20, Ownable {
     mapping (address => bool) private _exemptFromFee;
 
     bool private _tradingEnabled = false;
-    uint private _blockTimestampAtCreation;
+    uint private _blockAtEnableTrading;
 
     IUniswapV2Router02 public quickSwapRouter;
     address public quickSwapPair;
@@ -103,7 +103,7 @@ contract ParrotlyFinance is ERC20, Ownable {
     event UpdateServiceWallet(address indexed newAddress);
     event UpdateBuyFee(uint indexed previousBuyFee, uint indexed newBuyFee);
     event UpdateSellFee(uint indexed previousSellFee, uint indexed newSellFee);
-    event ExcludeFromFees(address indexed newAdress, bool indexed value);
+    event ExcludeFromFees(address indexed newAddress, bool indexed value);
     event SetAutomatedMarketMakerPair(address indexed pairAddress, bool indexed value);
 
     // Modifier
@@ -114,21 +114,22 @@ contract ParrotlyFinance is ERC20, Ownable {
             return;
         }
 
-        require(_tradingEnabled || msg.sender == owner(), "Trading is not enabled");
+        require(_tradingEnabled, "Trading is not enabled");
 
-        if((_blockTimestampAtCreation + 15 < block.number) && msg.sender != owner()) {
+        if(block.number > _blockAtEnableTrading + 3) {
+            _;
+        }
+        else {
             _buyFee = 99;
             _sellFee = 99;
             _;
             _buyFee = _previousBuyFee;
             _sellFee = _previousSellFee;
-        } else {
-            _;
         }
     }
 
     // Constructor
-    constructor() ERC20("ParrotlyFinance", "PBIRB") {
+    constructor() ERC20("Parrotly", "PBIRB") {
         initPair();
 
         excludeFromFees(owner(), true);
@@ -153,7 +154,7 @@ contract ParrotlyFinance is ERC20, Ownable {
         require(recipient != address(0), "Transfer to the zero address");
 
         if(sender != owner())
-            require(_tradingEnabled, "Trading is not enable");
+            require(_tradingEnabled, "Trading is not enabled");
 
         if(skipTax(sender, recipient)) {
             super._transfer(sender, recipient, amount);
@@ -190,17 +191,9 @@ contract ParrotlyFinance is ERC20, Ownable {
 
     function enableTrading() public onlyOwner {
         _tradingEnabled = true;
-        _blockTimestampAtCreation = block.number;
+        _blockAtEnableTrading = block.number;
 
         emit EnableTrading();
-    }
-
-    function getActiveBlockTimetamp() public view returns(uint) {
-        return _blockTimestampAtCreation;
-    }
-
-    function getBlockTimetamp() public view returns(uint) {
-        return block.number;
     }
 
     function excludeFromFees(address excludedAddress, bool value) public onlyOwner {
@@ -292,7 +285,7 @@ contract ParrotlyFinance is ERC20, Ownable {
 
     // Private
 
-    function _buyTransfert(
+    function _buyTransfer(
         address sender,
         address recipient,
         uint amount
@@ -345,7 +338,7 @@ contract ParrotlyFinance is ERC20, Ownable {
         uint amount
     ) private {
         if (_automatedMarketMakerPairs[sender]) {
-            _buyTransfert(sender, recipient, amount);
+            _buyTransfer(sender, recipient, amount);
         } else if (_automatedMarketMakerPairs[recipient]) {
             _sellTransfer(sender, recipient, amount);
         } else {

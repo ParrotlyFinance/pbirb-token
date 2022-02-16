@@ -1,4 +1,4 @@
-const ParrotlyFinance = artifacts.require("ParrotlyFinance");
+const Parrotly = artifacts.require("Parrotly");
 const time_travel = require("./helpers/time_travel");
 const { assert } = require("chai");
 const chai = require("chai");
@@ -6,7 +6,7 @@ const chaiAsPromised = require("chai-as-promised");
 const truffleAssert = require('truffle-assertions');
 chai.use(chaiAsPromised);
 
-contract("ParrotlyFinance", (accounts) => {
+contract("Parrotly", (accounts) => {
   const deployer = accounts[0];
   const _serviceWallet = "0x049DE3990D8a938d627730696a53B7042782120E";
   const _deadWallet = "0x000000000000000000000000000000000000dEaD";
@@ -16,8 +16,8 @@ contract("ParrotlyFinance", (accounts) => {
   var snapShot;
   var snapshotId;
 
-  beforeEach('Setup contract', async () => {
-    contract = await ParrotlyFinance.new();
+  beforeEach("Setup contract", async () => {
+    contract = await Parrotly.new();
     contract_address = contract.address;
   });
 
@@ -27,7 +27,7 @@ contract("ParrotlyFinance", (accounts) => {
     it("Sets basic token information", async function () {
       var supply = await contract.totalSupply()
 
-      assert.equal(await contract.name(), "ParrotlyFinance");
+      assert.equal(await contract.name(), "Parrotly");
       assert.equal(await contract.symbol(), "PBIRB");
       assert.equal(await contract.totalSupply(), _totalSupply);
       assert.equal(await contract.decimals(), 18);
@@ -185,23 +185,72 @@ contract("ParrotlyFinance", (accounts) => {
       });
     });
 
-    context ("When the Trading is enable for less than 5 block and send is NOT owner", async () => {
+    context ("When the trading is enabled for less than or equal to 2 blocks and sender is NOT owner", async () => {
       beforeEach("Activate Trading", async () => {
         await contract.transfer(accounts[1], 1000, { from: accounts[0] });
+        await contract.transfer(accounts[4], 1000, { from: accounts[0] });
         await contract.setAutomatedMarketMakerPair(accounts[1], true);
+        await contract.setAutomatedMarketMakerPair(accounts[3], true);
         await contract.enableTrading();
         snapShot = await time_travel.takeSnapshot();
         snapshotId = snapShot['result'];
       });
 
-      it ("Set the tax to 99%", async () => {
+      it ("Sets the buy tax to 99%", async () => {
         await time_travel.revertToSnapShot(snapshotId);
+
         await contract.transfer(accounts[2], 1000, { from: accounts[1] });
-        console.log(await contract.balanceOf(accounts[2]));
         
-        assert.equal(await contract.balanceOf(accounts[2]), 300);
-        assert.equal(await contract.balanceOf(_serviceWallet), 700);
+        assert.equal(await contract.balanceOf(accounts[2]), 10);
+        assert.equal(await contract.balanceOf(_serviceWallet), 990);
       });
+
+      it ("Sets the sell tax to 99%", async () => {
+        await time_travel.revertToSnapShot(snapshotId);
+
+        await contract.transfer(accounts[3], 1000, { from: accounts[4] });
+        
+        assert.equal(await contract.balanceOf(accounts[3]), 10);
+        assert.equal(await contract.balanceOf(_deadWallet), 990);
+      });      
+    });
+
+    context ("When the trading is enabled for more than 2 blocks and sender is NOT owner", async () => {
+      beforeEach("Activate Trading", async () => {
+        await contract.transfer(accounts[1], 1000, { from: accounts[0] });
+        await contract.transfer(accounts[4], 1000, { from: accounts[0] });
+        await contract.setAutomatedMarketMakerPair(accounts[1], true);
+        await contract.setAutomatedMarketMakerPair(accounts[3], true);
+        await contract.enableTrading();
+        snapShot = await time_travel.takeSnapshot();
+        snapshotId = snapShot['result'];
+      });
+  
+      it ("Ensures 99% buy tax is disabled", async () => {
+        await time_travel.revertToSnapShot(snapshotId);
+  
+        await time_travel.advanceBlock();
+        await time_travel.advanceBlock();
+        await time_travel.advanceBlock();
+  
+        await contract.transfer(accounts[2], 1000, { from: accounts[1] });
+        
+        assert.equal(await contract.balanceOf(accounts[2]), 960);
+        assert.equal(await contract.balanceOf(_serviceWallet), 40);
+      });
+
+      it ("Ensures 99% sell tax is disabled", async () => {
+        await time_travel.revertToSnapShot(snapshotId);
+  
+        await time_travel.advanceBlock();
+        await time_travel.advanceBlock();
+        await time_travel.advanceBlock();
+  
+        await contract.transfer(accounts[3], 1000, { from: accounts[4] });
+        
+        assert.equal(await contract.balanceOf(accounts[3]), 980);
+        assert.equal(await contract.balanceOf(_deadWallet), 20);
+      });      
     });
   });
 
@@ -210,8 +259,8 @@ contract("ParrotlyFinance", (accounts) => {
       await contract.transfer(accounts[1], 10000000, { from: accounts[0] });
       await contract.enableTrading();
 
-      // Time Travel to set the next block timestamp to +100sec
-      await time_travel.advanceTimeAndBlock(100);
+      await time_travel.advanceBlock();
+      await time_travel.advanceBlock();
     });
 
     context ("When the sender or receiver are exempt from fees", async () => {

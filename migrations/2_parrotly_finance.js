@@ -1,5 +1,5 @@
-const ParrotlyFinance = artifacts.require("ParrotlyFinance");
+const Parrotly = artifacts.require("Parrotly");
 
 module.exports = async function (deployer) {
-  await deployer.deploy(ParrotlyFinance);
+  await deployer.deploy(Parrotly);
 }
