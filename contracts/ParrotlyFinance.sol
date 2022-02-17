@@ -80,9 +80,11 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 contract Parrotly is ERC20, Ownable {
     using Address for address;
 
-    uint8 public _buyFee = 4;
+    bool private _buyFeeAllowed = true;
+    bool private _sellFeeAllowed = true;
+    uint8 private _buyFee = 4;
     uint8 private _previousBuyFee = _buyFee;
-    uint8 public _sellFee = 2;
+    uint8 private _sellFee = 2;
     uint8 private _previousSellFee = _sellFee;
     
     mapping (address => bool) public _automatedMarketMakerPairs;
@@ -210,21 +212,29 @@ contract Parrotly is ERC20, Ownable {
     }
 
     function removeFees() public onlyOwner {
-        if (_buyFee == 0 && _sellFee == 0) 
-            return;
+        require(_buyFeeAllowed || _sellFeeAllowed, "Fees are permanently disabled");
 
-        _previousBuyFee = _buyFee;
-        _previousSellFee = _sellFee;
+        if (_buyFeeAllowed) {
+            _previousBuyFee = _buyFee;
+            _buyFee = 0;
+        }
 
-        _buyFee = 0;
-        _sellFee = 0;
+        if (_sellFeeAllowed) {
+            _previousSellFee = _sellFee;
+            _sellFee = 0;
+        }
 
         emit RemoveFees();
     }
 
     function restoreFees() public onlyOwner {
-        _buyFee = _previousBuyFee;
-        _sellFee = _previousSellFee;
+        require(_buyFeeAllowed || _sellFeeAllowed, "Fees are permanently disabled");
+
+        if(_buyFeeAllowed) 
+            _buyFee = _previousBuyFee;
+
+        if(_sellFeeAllowed)
+            _sellFee = _previousSellFee;
 
         emit RestoreFees();
     }
@@ -246,11 +256,15 @@ contract Parrotly is ERC20, Ownable {
     }
 
     function updateBuyFee(uint8 value) public onlyOwner returns(uint8, uint8) {
+        require(_buyFeeAllowed, "Buy fee is permanently disabled");
         require(value <= 4, "Cannot be higher than 4");
         require(value < _buyFee, "Cannot increase the fee");
 
         _previousBuyFee = _buyFee;
         _buyFee = value;
+
+        if(_buyFee == 0)
+            _buyFeeAllowed = false;
 
         emit UpdateBuyFee(_previousBuyFee, value);
 
@@ -269,11 +283,15 @@ contract Parrotly is ERC20, Ownable {
     }
 
     function updateSellFee(uint8 value) public onlyOwner returns(uint8, uint8) {
+        require(_sellFeeAllowed, "Sell fee is permanently disabled");
         require(value <= 2, "Cannot be higher than 2");
         require(value < _sellFee, "Cannot increase the fee");
 
         _previousSellFee = _sellFee;
         _sellFee = value;
+
+        if(_sellFee == 0)
+            _sellFeeAllowed = false;
 
         emit UpdateSellFee(_previousSellFee, value);
         

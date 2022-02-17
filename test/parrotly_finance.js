@@ -91,6 +91,16 @@ contract("Parrotly", (accounts) => {
       assert.equal(await contract.buyFee(), 0);
       assert.equal(await contract.sellFee(), 0);
     });
+
+    it ("cannot be called once fees are disabled", async () => {
+      await contract.updateBuyFee(0);
+      await contract.updateSellFee(0);
+
+      await truffleAssert.fails(
+        contract.removeFees(),
+        "Fees are permanently disabled"
+      );
+    });
   });
 
   context ("#restoreFees", async () => {
@@ -99,6 +109,28 @@ contract("Parrotly", (accounts) => {
       await contract.restoreFees();
       assert.equal(await contract.buyFee(), 4);
       assert.equal(await contract.sellFee(), 2);
+    });
+
+    it ("buy fee is not affected once set to 0", async () => {
+      await contract.updateBuyFee(0);
+      await contract.restoreFees();
+      assert.equal(await contract.buyFee(), 0);
+    });
+
+    it ("sell fee is not affected once set to 0", async () => {
+      await contract.updateSellFee(0);
+      await contract.restoreFees();
+      assert.equal(await contract.sellFee(), 0);
+    });
+
+    it ("cannot be called once fees are disabled", async () => {
+      await contract.updateBuyFee(0);
+      await contract.updateSellFee(0);
+
+      await truffleAssert.fails(
+        contract.restoreFees(),
+        "Fees are permanently disabled"
+      );
     });
   });
 
@@ -127,6 +159,14 @@ contract("Parrotly", (accounts) => {
           contract.updateBuyFee(3),
           "Cannot increase the fee"
         );
+    });
+
+    it ("is disabled after being set to 0", async () => {
+      await contract.updateBuyFee(0);
+      await truffleAssert.fails(
+          contract.updateBuyFee(0),
+          "Buy fee is permanently disabled"
+      );
     });
   });
 
@@ -161,11 +201,19 @@ contract("Parrotly", (accounts) => {
       );
     });
 
-    it ("Cannot be increased higher than the current tax", async () => {
+    it ("cannot be increased higher than the current tax", async () => {
+      await contract.updateSellFee(1);
+      await truffleAssert.fails(
+          contract.updateSellFee(2),
+          "Cannot increase the fee"
+      );
+    });
+
+    it ("is disabled after being set to 0", async () => {
       await contract.updateSellFee(0);
       await truffleAssert.fails(
-          contract.updateSellFee(1),
-          "Cannot increase the fee"
+          contract.updateSellFee(0),
+          "Sell fee is permanently disabled"
       );
     });
   });
