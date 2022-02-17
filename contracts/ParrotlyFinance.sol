@@ -130,7 +130,7 @@ contract Parrotly is ERC20, Ownable {
 
     // Constructor
     constructor() ERC20("Parrotly", "PBIRB") {
-        initPair();
+        //initPair();
 
         excludeFromFees(owner(), true);
         excludeFromFees(address(this), true);
@@ -152,11 +152,9 @@ contract Parrotly is ERC20, Ownable {
     ) internal override canTrade {
         require(sender != address(0), "Transfer from the zero address");
         require(recipient != address(0), "Transfer to the zero address");
+        require(_tradingEnabled || sender == owner(), "Trading is not enabled");
 
-        if(sender != owner())
-            require(_tradingEnabled, "Trading is not enabled");
-
-        if(skipTax(sender, recipient)) {
+        if(skipFees(sender, recipient)) {
             super._transfer(sender, recipient, amount);
         } else {
             _tokenTransfer(sender, recipient, amount);
@@ -175,7 +173,6 @@ contract Parrotly is ERC20, Ownable {
 
         setAutomatedMarketMakerPair(_quickSwapPair, true);
     }
-
 
     // External
 
@@ -327,7 +324,7 @@ contract Parrotly is ERC20, Ownable {
         emit Transfer(sender, recipient, amount);
     }
 
-    function skipTax(address sender, address recipient) private view returns (bool) {
+    function skipFees(address sender, address recipient) private view returns (bool) {
         return (!_automatedMarketMakerPairs[sender] && !_automatedMarketMakerPairs[recipient]) &&
             (_exemptFromFee[sender] || _exemptFromFee[recipient]);
     }
