@@ -43,6 +43,6 @@
     "ts-standard": "^11.0.0"
   },
   "dependencies": {
-    "solc": "^0.8.11"
+    "solc": "0.8.11"
   }
 }
