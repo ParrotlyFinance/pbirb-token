@@ -130,7 +130,7 @@ contract Parrotly is ERC20, Ownable {
 
     // Constructor
     constructor() ERC20("Parrotly", "PBIRB") {
-        //initPair();
+        initPair();
 
         exemptAddressFromFees(owner(), true);
         exemptAddressFromFees(address(this), true);
