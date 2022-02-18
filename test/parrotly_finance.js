@@ -25,8 +25,6 @@ contract("Parrotly", (accounts) => {
   
   context ("With initial deployment", async () => {
     it("Sets basic token information", async function () {
-      var supply = await contract.totalSupply()
-
       assert.equal(await contract.name(), "Parrotly");
       assert.equal(await contract.symbol(), "PBIRB");
       assert.equal(await contract.totalSupply(), _totalSupply);
@@ -227,9 +225,16 @@ contract("Parrotly", (accounts) => {
         );
       });
 
-      it ("transfers and allow without any fees if sender IS owner", async () => {
+      it ("transfers and allow without any fees if sender is owner", async () => {
         await contract.transfer(accounts[1], 10000000, { from: accounts[0] });
         assert.equal(await contract.balanceOf(accounts[1]), 10000000);
+      });
+
+      it ("transfers and allow without any fees if sender is exempt", async () => {
+        await contract.transfer(accounts[1], 10000000, { from: accounts[0] });
+        await contract.exemptAddressFromFees(accounts[1], true);
+        await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
+        assert.equal(await contract.balanceOf(accounts[2]), 10000000);
       });
     });
 

@@ -111,8 +111,8 @@ contract Parrotly is ERC20, Ownable {
 
     // Modifier
 
-    modifier canTrade {
-        if (msg.sender == owner()) {
+    modifier canTransfer {
+        if (msg.sender == owner() || getAddressExemptFromFees(msg.sender)) {
             _;
             return;
         }
@@ -163,10 +163,10 @@ contract Parrotly is ERC20, Ownable {
         address sender,
         address recipient,
         uint amount
-    ) internal override canTrade {
+    ) internal override canTransfer {
         require(sender != address(0), "Transfer from the zero address");
         require(recipient != address(0), "Transfer to the zero address");
-        require(_tradingEnabled || sender == owner(), "Trading is not enabled");
+        require(_tradingEnabled || sender == owner() || getAddressExemptFromFees(sender), "Trading is not enabled");
 
         if(_buyFeePermanentlyDisabled && _sellFeePermanentlyDisabled) {
             super._transfer(sender, recipient, amount);
