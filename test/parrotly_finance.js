@@ -8,7 +8,7 @@ chai.use(chaiAsPromised);
 
 contract("Parrotly", (accounts) => {
   const deployer = accounts[0];
-  const _serviceWallet = "0x049DE3990D8a938d627730696a53B7042782120E";
+  const _serviceWallet = "0x8973e1f6897d9bBe1C369c974f36771f75931863";
   const _deadWallet = "0x000000000000000000000000000000000000dEaD";
   const _totalSupply = 1000000000000000000000000000000;
   var contract;

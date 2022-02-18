@@ -97,7 +97,7 @@ contract Parrotly is ERC20, Ownable {
     IUniswapV2Router02 public quickSwapRouter;
     address public quickSwapPair;
     address private _routerAddress = 0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff; // Quickswap
-    address private _serviceWallet = 0x049DE3990D8a938d627730696a53B7042782120E;
+    address private _serviceWallet = 0x8973e1f6897d9bBe1C369c974f36771f75931863;
     address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     event EnableTrading();
@@ -111,15 +111,12 @@ contract Parrotly is ERC20, Ownable {
 
     // Modifier
 
-    modifier canTransfer {
-        if (msg.sender == owner() || getAddressExemptFromFees(msg.sender)) {
-            _;
-            return;
-        }
+    modifier canTransfer(address sender, address recipient) {        
+        require(sender != address(0), "Transfer from the zero address");
+        require(recipient != address(0), "Transfer to the zero address");
+        require(_tradingEnabled || sender == owner() || getAddressExemptFromFees(sender), "Trading is not enabled");
 
-        require(_tradingEnabled, "Trading is not enabled");
-
-        if(block.number > _blockAtEnableTrading + 3) {
+        if(block.number > _blockAtEnableTrading + 3 || sender == owner() || getAddressExemptFromFees(sender)) {
             _;
         }
         else {
@@ -163,11 +160,7 @@ contract Parrotly is ERC20, Ownable {
         address sender,
         address recipient,
         uint amount
-    ) internal override canTransfer {
-        require(sender != address(0), "Transfer from the zero address");
-        require(recipient != address(0), "Transfer to the zero address");
-        require(_tradingEnabled || sender == owner() || getAddressExemptFromFees(sender), "Trading is not enabled");
-
+    ) internal override canTransfer(sender, recipient) {
         if(_buyFeePermanentlyDisabled && _sellFeePermanentlyDisabled) {
             super._transfer(sender, recipient, amount);
         }
