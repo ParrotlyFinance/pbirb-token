@@ -62,6 +62,7 @@
  *      The removal of taxes is definitive.
  *    - Service wallet and CEX wallets are and will be excluded from any tax.
  *    - 0 initial dev or team wallets.
+ *    - Anti-snipe on first two blocks
  *
  *
  *  Website -------- https://parrotly.finance
@@ -80,15 +81,15 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 contract Parrotly is ERC20, Ownable {
     using Address for address;
 
-    bool private _buyFeeAllowed = true;
-    bool private _sellFeeAllowed = true;
+    bool private _buyFeePermanentlyDisabled = false;
+    bool private _sellFeePermanentlyDisabled = false;
     uint8 private _buyFee = 4;
     uint8 private _previousBuyFee = _buyFee;
     uint8 private _sellFee = 2;
     uint8 private _previousSellFee = _sellFee;
     
-    mapping (address => bool) public _automatedMarketMakerPairs;
-    mapping (address => bool) private _exemptFromFee;
+    mapping (address => bool) public _dexSwapAddresses;
+    mapping (address => bool) private _addressesExemptFromFees;
 
     bool private _tradingEnabled = false;
     uint private _blockAtEnableTrading;
@@ -105,8 +106,8 @@ contract Parrotly is ERC20, Ownable {
     event UpdateServiceWallet(address indexed newAddress);
     event UpdateBuyFee(uint indexed previousBuyFee, uint indexed newBuyFee);
     event UpdateSellFee(uint indexed previousSellFee, uint indexed newSellFee);
-    event ExcludeFromFees(address indexed newAddress, bool indexed value);
-    event SetAutomatedMarketMakerPair(address indexed pairAddress, bool indexed value);
+    event ExemptAddressFromFees(address indexed newAddress, bool indexed value);
+    event AddDexSwapAddress(address indexed pairAddress, bool indexed value);
 
     // Modifier
 
@@ -134,9 +135,9 @@ contract Parrotly is ERC20, Ownable {
     constructor() ERC20("Parrotly", "PBIRB") {
         //initPair();
 
-        excludeFromFees(owner(), true);
-        excludeFromFees(address(this), true);
-        excludeFromFees(_serviceWallet, true);
+        exemptAddressFromFees(owner(), true);
+        exemptAddressFromFees(address(this), true);
+        exemptAddressFromFees(_serviceWallet, true);
 
         _mint(owner(), (1 * 10**12) * (10**18));
     }
@@ -147,6 +148,17 @@ contract Parrotly is ERC20, Ownable {
 
     // Internal
 
+    function applyFees(address sender, address recipient) private view returns (bool) {
+        bool dexSwapDetected = _dexSwapAddresses[sender] || _dexSwapAddresses[recipient];
+        bool exemptAddressDetected = _addressesExemptFromFees[sender] || _addressesExemptFromFees[recipient];
+
+        if( dexSwapDetected && !exemptAddressDetected ) {
+            return true;
+        }
+
+        return false;
+    }
+
     function _transfer(
         address sender,
         address recipient,
@@ -156,10 +168,14 @@ contract Parrotly is ERC20, Ownable {
         require(recipient != address(0), "Transfer to the zero address");
         require(_tradingEnabled || sender == owner(), "Trading is not enabled");
 
-        if(skipFees(sender, recipient)) {
+        if(_buyFeePermanentlyDisabled && _sellFeePermanentlyDisabled) {
             super._transfer(sender, recipient, amount);
-        } else {
+        }
+        else if(applyFees(sender, recipient)) {
             _tokenTransfer(sender, recipient, amount);
+        }
+        else {
+            super._transfer(sender, recipient, amount);
         }
     }
 
@@ -173,7 +189,7 @@ contract Parrotly is ERC20, Ownable {
         quickSwapPair = _quickSwapPair;
         quickSwapRouter = _quickSwapRouter;
 
-        setAutomatedMarketMakerPair(_quickSwapPair, true);
+        addDexSwapAddress(_quickSwapPair, true);
     }
 
     // External
@@ -195,31 +211,31 @@ contract Parrotly is ERC20, Ownable {
         emit EnableTrading();
     }
 
-    function excludeFromFees(address excludedAddress, bool value) public onlyOwner {
-        require(_exemptFromFee[excludedAddress] != value, "Already set to this value");
+    function exemptAddressFromFees(address excludedAddress, bool value) public onlyOwner {
+        require(_addressesExemptFromFees[excludedAddress] != value, "Already set to this value");
 
-        _exemptFromFee[excludedAddress] = value;
+        _addressesExemptFromFees[excludedAddress] = value;
 
-        emit ExcludeFromFees(excludedAddress, value);
+        emit ExemptAddressFromFees(excludedAddress, value);
     }
 
-    function excludedFromFees(address excludedAddress) public view returns (bool) {
-        return _exemptFromFee[excludedAddress];
+    function getAddressExemptFromFees(address excludedAddress) public view returns (bool) {
+        return _addressesExemptFromFees[excludedAddress];
     }
 
-    function getAutomatedMarketMakerPair(address pairAddress) public view onlyOwner returns (bool) {
-        return _automatedMarketMakerPairs[pairAddress];
+    function getDexSwapAddress(address pairAddress) public view onlyOwner returns (bool) {
+        return _dexSwapAddresses[pairAddress];
     }
 
     function removeFees() public onlyOwner {
-        require(_buyFeeAllowed || _sellFeeAllowed, "Fees are permanently disabled");
+        require(!_buyFeePermanentlyDisabled || !_sellFeePermanentlyDisabled, "Fees are permanently disabled");
 
-        if (_buyFeeAllowed) {
+        if (!_buyFeePermanentlyDisabled) {
             _previousBuyFee = _buyFee;
             _buyFee = 0;
         }
 
-        if (_sellFeeAllowed) {
+        if (!_sellFeePermanentlyDisabled) {
             _previousSellFee = _sellFee;
             _sellFee = 0;
         }
@@ -228,12 +244,12 @@ contract Parrotly is ERC20, Ownable {
     }
 
     function restoreFees() public onlyOwner {
-        require(_buyFeeAllowed || _sellFeeAllowed, "Fees are permanently disabled");
+        require(!_buyFeePermanentlyDisabled || !_sellFeePermanentlyDisabled, "Fees are permanently disabled");
 
-        if(_buyFeeAllowed) 
+        if(!_buyFeePermanentlyDisabled) 
             _buyFee = _previousBuyFee;
 
-        if(_sellFeeAllowed)
+        if(!_sellFeePermanentlyDisabled)
             _sellFee = _previousSellFee;
 
         emit RestoreFees();
@@ -243,12 +259,12 @@ contract Parrotly is ERC20, Ownable {
         return _serviceWallet;
     }
 
-    function setAutomatedMarketMakerPair(address pairAddress, bool value) public onlyOwner {
-        require(_automatedMarketMakerPairs[pairAddress] != value, "Address already in-use");
+    function addDexSwapAddress(address pairAddress, bool value) public onlyOwner {
+        require(_dexSwapAddresses[pairAddress] != value, "Address already in-use");
         
-        _automatedMarketMakerPairs[pairAddress] = value;
+        _dexSwapAddresses[pairAddress] = value;
         
-        emit SetAutomatedMarketMakerPair(pairAddress, value);
+        emit AddDexSwapAddress(pairAddress, value);
     }
 
     function totalSupply() public view virtual override returns (uint) {
@@ -256,7 +272,7 @@ contract Parrotly is ERC20, Ownable {
     }
 
     function updateBuyFee(uint8 value) public onlyOwner returns(uint8, uint8) {
-        require(_buyFeeAllowed, "Buy fee is permanently disabled");
+        require(!_buyFeePermanentlyDisabled, "Buy fee is permanently disabled");
         require(value <= 4, "Cannot be higher than 4");
         require(value < _buyFee, "Cannot increase the fee");
 
@@ -264,7 +280,7 @@ contract Parrotly is ERC20, Ownable {
         _buyFee = value;
 
         if(_buyFee == 0)
-            _buyFeeAllowed = false;
+            _buyFeePermanentlyDisabled = true;
 
         emit UpdateBuyFee(_previousBuyFee, value);
 
@@ -274,8 +290,8 @@ contract Parrotly is ERC20, Ownable {
     function updateServiceWallet(address newServiceWallet) public onlyOwner {
         require(_serviceWallet != newServiceWallet, "Address is already in-use");
 
-        _exemptFromFee[_serviceWallet] = false; // Restore fee for old Service Wallet
-        _exemptFromFee[newServiceWallet] = true; // Exclude new Service Wallet
+        _addressesExemptFromFees[_serviceWallet] = false; // Restore fee for old Service Wallet
+        _addressesExemptFromFees[newServiceWallet] = true; // Exclude new Service Wallet
 
         _serviceWallet = newServiceWallet;
 
@@ -283,7 +299,7 @@ contract Parrotly is ERC20, Ownable {
     }
 
     function updateSellFee(uint8 value) public onlyOwner returns(uint8, uint8) {
-        require(_sellFeeAllowed, "Sell fee is permanently disabled");
+        require(!_sellFeePermanentlyDisabled, "Sell fee is permanently disabled");
         require(value <= 2, "Cannot be higher than 2");
         require(value < _sellFee, "Cannot increase the fee");
 
@@ -291,7 +307,7 @@ contract Parrotly is ERC20, Ownable {
         _sellFee = value;
 
         if(_sellFee == 0)
-            _sellFeeAllowed = false;
+            _sellFeePermanentlyDisabled = true;
 
         emit UpdateSellFee(_previousSellFee, value);
         
@@ -336,15 +352,10 @@ contract Parrotly is ERC20, Ownable {
         uint _totalFee = _calculateSellFee(amount);
         uint _amountWithFee = amount - _totalFee;
 
-        super._transfer(sender, recipient, _amountWithFee); // Send coin to buyer
+        super._transfer(sender, recipient, _amountWithFee); // Send coin to seller
         super._transfer(sender, DEAD, _totalFee); // Send coin to Dead Wallet
 
         emit Transfer(sender, recipient, amount);
-    }
-
-    function skipFees(address sender, address recipient) private view returns (bool) {
-        return (!_automatedMarketMakerPairs[sender] && !_automatedMarketMakerPairs[recipient]) &&
-            (_exemptFromFee[sender] || _exemptFromFee[recipient]);
     }
 
     function _tokenTransfer(
@@ -352,9 +363,9 @@ contract Parrotly is ERC20, Ownable {
         address recipient,
         uint amount
     ) private {
-        if (_automatedMarketMakerPairs[sender]) {
+        if (_dexSwapAddresses[sender]) {
             _buyTransfer(sender, recipient, amount);
-        } else if (_automatedMarketMakerPairs[recipient]) {
+        } else if (_dexSwapAddresses[recipient]) {
             _sellTransfer(sender, recipient, amount);
         } else {
             super._transfer(sender, recipient, amount);

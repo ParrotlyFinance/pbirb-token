@@ -37,18 +37,18 @@ contract("Parrotly", (accounts) => {
     });
 
     it ("Excludes from fees Deployer, Contract and the Service Wallet", async function () {
-      assert.isTrue(await contract.excludedFromFees(deployer));
-      assert.isTrue(await contract.excludedFromFees(contract_address));
-      assert.isTrue(await contract.excludedFromFees(_serviceWallet));
+      assert.isTrue(await contract.getAddressExemptFromFees(deployer));
+      assert.isTrue(await contract.getAddressExemptFromFees(contract_address));
+      assert.isTrue(await contract.getAddressExemptFromFees(_serviceWallet));
     });
   });
 
   // External
 
-  context ("#setAutomatedMarketMakerPair", async () => {
+  context ("#addDexSwapAddress", async () => {
     it ("Set and address as MarketPair", async () => {
-      await contract.setAutomatedMarketMakerPair(accounts[1], true);
-      assert.isTrue(await contract.getAutomatedMarketMakerPair(accounts[1]));
+      await contract.addDexSwapAddress(accounts[1], true);
+      assert.isTrue(await contract.getDexSwapAddress(accounts[1]));
     });
   });
 
@@ -66,18 +66,18 @@ contract("Parrotly", (accounts) => {
 
   // Public
 
-  context ("#excludeFromFees", async () => {
-    it("Add wallet to excludeFromFees", async () => {
-      assert.isFalse(await contract.excludedFromFees(accounts[1]));
-      await contract.excludeFromFees(accounts[1], true);
-      assert.isTrue(await contract.excludedFromFees(accounts[1]));
+  context ("#exemptAddressFromFees", async () => {
+    it("Add wallet to exemptAddressFromFees", async () => {
+      assert.isFalse(await contract.getAddressExemptFromFees(accounts[1]));
+      await contract.exemptAddressFromFees(accounts[1], true);
+      assert.isTrue(await contract.getAddressExemptFromFees(accounts[1]));
     });
 
     it ("Cannot add an address with the same value", async () => {
-      await contract.excludeFromFees(accounts[1], true); // Add it first
+      await contract.exemptAddressFromFees(accounts[1], true); // Add it first
 
       await truffleAssert.fails(
-        contract.excludeFromFees(accounts[1], true),
+        contract.exemptAddressFromFees(accounts[1], true),
         "Already set to this value"
       );
     });
@@ -177,7 +177,7 @@ contract("Parrotly", (accounts) => {
 
     it ("Changes the serviceWallet address and exclude it from the fees", async () => {
       assert.equal(await contract.serviceWallet(), accounts[1]);
-      assert.equal(await contract.excludedFromFees(accounts[1]), true);
+      assert.equal(await contract.getAddressExemptFromFees(accounts[1]), true);
     });
 
     it ("Cannot be updated with the same address", async () => {
@@ -237,8 +237,8 @@ contract("Parrotly", (accounts) => {
       beforeEach("Activate Trading", async () => {
         await contract.transfer(accounts[1], 1000, { from: accounts[0] });
         await contract.transfer(accounts[4], 1000, { from: accounts[0] });
-        await contract.setAutomatedMarketMakerPair(accounts[1], true);
-        await contract.setAutomatedMarketMakerPair(accounts[3], true);
+        await contract.addDexSwapAddress(accounts[1], true);
+        await contract.addDexSwapAddress(accounts[3], true);
         await contract.enableTrading();
         snapShot = await time_travel.takeSnapshot();
         snapshotId = snapShot['result'];
@@ -267,8 +267,8 @@ contract("Parrotly", (accounts) => {
       beforeEach("Activate Trading", async () => {
         await contract.transfer(accounts[1], 1000, { from: accounts[0] });
         await contract.transfer(accounts[4], 1000, { from: accounts[0] });
-        await contract.setAutomatedMarketMakerPair(accounts[1], true);
-        await contract.setAutomatedMarketMakerPair(accounts[3], true);
+        await contract.addDexSwapAddress(accounts[1], true);
+        await contract.addDexSwapAddress(accounts[3], true);
         await contract.enableTrading();
         snapShot = await time_travel.takeSnapshot();
         snapshotId = snapShot['result'];
@@ -313,29 +313,29 @@ contract("Parrotly", (accounts) => {
 
     context ("When the sender or receiver are exempt from fees", async () => {
       beforeEach('Adds address as exempt from fees', async () => {
-        await contract.excludeFromFees(accounts[1], true);
+        await contract.exemptAddressFromFees(accounts[1], true);
       });
 
       it ("Sends the token without any fee", async () => {
-        assert.isTrue(await contract.excludedFromFees(accounts[1]));
+        assert.isTrue(await contract.getAddressExemptFromFees(accounts[1]));
         await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
         assert.equal(await contract.balanceOf(accounts[2]), 10000000);
       });
     });
 
-    context ("When the sender AND receiver are NOT a Market Pair address (see _automatedMarketMakerPairs)", async () => {
+    context ("When the sender AND receiver are NOT a dex swap address (see _dexSwapAddresses)", async () => {
       it ("Sends the token without any fee", async () => {
-        assert.isFalse(await contract.getAutomatedMarketMakerPair(accounts[0]));
-        assert.isFalse(await contract.getAutomatedMarketMakerPair(accounts[1]));
+        assert.isFalse(await contract.getDexSwapAddress(accounts[0]));
+        assert.isFalse(await contract.getDexSwapAddress(accounts[1]));
 
         await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
         assert.equal(await contract.balanceOf(accounts[2]), 10000000);
       });
     });
 
-    context ("When the sender is a Market Pair Address", async () => {
-      beforeEach("Add accounts[1] as Market Pair Address", async () => {
-        await contract.setAutomatedMarketMakerPair(accounts[1], true);
+    context ("When the sender is a dex swap address", async () => {
+      beforeEach("Add accounts[1] as dex swap address", async () => {
+        await contract.addDexSwapAddress(accounts[1], true);
         await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
       });
 
@@ -348,9 +348,9 @@ contract("Parrotly", (accounts) => {
       });
     });
 
-    context ("When the recipient is a Market Pair Address", async () => {
-      beforeEach("Add accounts[1] as Market Pair Address", async () => {
-        await contract.setAutomatedMarketMakerPair(accounts[2], true);
+    context ("When the recipient is a dex swap address", async () => {
+      beforeEach("Add accounts[1] as dex swap address", async () => {
+        await contract.addDexSwapAddress(accounts[2], true);
         await contract.transfer(accounts[2], 10000000, { from: accounts[1] });
       });
 
